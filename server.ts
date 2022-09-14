@@ -33,7 +33,7 @@ dotenv.config();
 
 // mongoose
 //     .connect(db, {
-//         useNewUrlParser: true,
+//         useNew Parser: true,
 //         useUnifiedTopology: true
 //     } as ConnectOptions)
 //     .then(() => {
@@ -62,6 +62,7 @@ io.on("connection", (socket:any) => {
   console.log(io.of("/").adapter);
 
   socket.on("joinRoom", (data:any) => {
+    
     //!todo add user to redis
     const user = userJoin(socket.id, data.username, data.room);
 
@@ -73,7 +74,7 @@ io.on("connection", (socket:any) => {
     socket.emit("message", formatMessage(botName, "Welcome to ChatCord!"));
 
     // Broadcast when a user connects
-    //except the sender
+    //send to everyone except to the sender
     socket.broadcast
       .to(user.room)
       .emit(
@@ -86,6 +87,7 @@ io.on("connection", (socket:any) => {
       room: user.room,
       users: getRoomUsers(user.room),
     });
+
   });
 
   // Listen for chatMessage
@@ -112,4 +114,5 @@ io.on("connection", (socket:any) => {
       });
     }
   });
+  
 });
