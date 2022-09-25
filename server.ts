@@ -53,16 +53,23 @@ var server = app.listen(PORTNUMBER, (): void => {
     console.log(`Server is running on ${PORTNUMBER}`);
 });
 
-var io = require("socket.io")(server);
+var io = require("socket.io")(server,{
+  cors: {
+    // origin: "http://localhost:3000/",
+    methods: ["GET", "POST"]
+  }
+});
 
 const botName = "ChatCord Bot";
   
   // Run when client connects
 io.on("connection", (socket:any) => {
-  console.log(io.of("/").adapter);
+
+  console.log("connected");
 
   socket.on("joinRoom", (data:any) => {
     
+    console.log("joined");
     //!todo add user to redis
     const user = userJoin(socket.id, data.username, data.room);
 
