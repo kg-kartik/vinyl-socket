@@ -34,4 +34,8 @@ export const getRoomUsers = (room:any):Array<Users> => {
   return users.filter(user => user.room === room);
 }
 
+export const getUsers = () => {
+  return users;
+}
+
 

@@ -17,6 +17,7 @@ import {
   getCurrentUser,
   userLeave,
   getRoomUsers,
+  getUsers,
 } from "./src/utils/users";
 
 app.use(bodyParser.json());
@@ -76,6 +77,7 @@ io.on("connection", (socket:any) => {
     console.log(user,"userr");
 
     socket.join(user.room);
+    console.log(socket.id)
 
     // Welcome current user
     socket.emit("message", formatMessage(botName, "Welcome to ChatCord!"));
@@ -100,9 +102,16 @@ io.on("connection", (socket:any) => {
   // Listen for chatMessage
   socket.on("chatMessage", (msg:any) => { 
     const user = getCurrentUser(socket.id);
+    console.log(socket.id);
 
-    io.to(user.room).emit("message", formatMessage(user.username, msg));
+    console.log(user,"user");
+  // socket.emit("message", "Hi this is a test message from server "+msg);
+    if(user) {
+      io.to(user.room).emit("message", formatMessage(user.username, msg));
+    }
   });
+
+  socket.emit("getUsers",getUsers());
 
   // Runs when client disconnects
   socket.on("disconnect", () => {
