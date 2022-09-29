@@ -21,6 +21,7 @@ import {
   getUsers,
 } from "./src/utils/users";
 import API from "./src/utils/request";
+import { getTracks, tracksSeed } from "./src/utils/tracks";
 
 app.use(bodyParser.json());
 app.use(cors());
@@ -74,10 +75,19 @@ io.on("connection", (socket:any) => {
 		try {
 		  const response = await API.post("/room/create",{
 		      admin_id:data.username,
-			room_id:data.room,
+			  room_id:data.room_id,
 		  })
-	
+		  
 		  console.log(response.data);
+
+		  const tracksRes = await API.post("/questions/create",{
+			track_ids:data.track_ids,
+			room_id:data.room_id
+		  })
+ 
+          const testVar = tracksSeed(tracksRes.data);		 
+
+		  console.log(testVar,"test");
 		}
 		catch (err) {
 			//catch err
@@ -127,7 +137,7 @@ io.on("connection", (socket:any) => {
   });
 
   // Listen for chatMessage
-  socket.on("chatMessage", (msg:any,roomId:any,id:any) => { 
+  	socket.on("chatMessage", (msg:any,roomId:any,id:any) => { 
 
 	//!todo answer validation
 
@@ -153,10 +163,32 @@ io.on("connection", (socket:any) => {
 	// })
 	
 	
-	const user = getCurrentUser(socket.id);
-	io.to(user.room).emit("message", formatMessage(user.username, msg));
+		const user = getCurrentUser(socket.id);
+		io.to(user.room).emit("message", formatMessage(user.username, msg));
 	
-  });
+  	});
+
+  	socket.on("startGame",(data:any) => {
+		var counter = 10;
+	
+		let user = getCurrentUser(socket.id);
+
+		io.to(user.room).emit("tracksData",getTracks());
+
+		var roundCountdown = setInterval(() => {
+	
+			io.to(user.room).emit('counter', counter);
+		
+			counter--;
+	
+			if (counter === 0) {
+				//next round
+				clearInterval(roundCountdown);
+			}
+		}, 1000);
+
+	}) 
+
 
   socket.emit("getUsers",getUsers());
 
