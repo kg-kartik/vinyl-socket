@@ -10,6 +10,7 @@ import {formatMessage} from "./src/utils/messages";
 import {createAdapter} from "@socket.io/redis-adapter";
 import * as redis from "redis";
 import axios from "axios";
+import {Tracks} from "./src/utils/tracks";
 
 require("dotenv").config();
 
@@ -50,133 +51,144 @@ var io = require("socket.io")(server,{
   }
 });
 
-const botName = "ChatCord Bot";
+const botName = "Vinyl";
   
   // Run when client connects
 io.on("connection", (socket:any) => {
 
-  console.log("connected");
+	console.log("connected");
 
-  socket.on("joinRoom", (data:any) => {
+	socket.on("joinRoom", (data:any) => {
 	
-	console.log("joined");
+		console.log("joined");
 
-	//!todo add user to redis
-	const user = userJoin(socket.id, data.username, data.room);
+		const user = userJoin(socket.id, data.username, data.room_id);
 
-	console.log(user,"userr");
+		console.log(user,"userr");
 
-	//joining room using socket id
-	socket.join(user.room);
-	console.log(socket.id)
+		//joining room using socket id
+		socket.join(user.room);
 
-	if(data.type === "admin"){
-	  const addToRedis = async () => {
-		try {
-		  const response = await API.post("/room/create",{
-		      admin_id:data.username,
-			  room_id:data.room_id,
-		  })
-		  
-		  console.log(response.data);
+		if(data.type === "admin"){
+			const addToRedis = async () => {
+			try {
+				const response = await API.post("/room/create",{
+					admin_id:data.username,
+					room_id:data.room_id,
+				})
+			
+				console.log(response.data);
 
-		  const tracksRes = await API.post("/questions/create",{
-			track_ids:data.track_ids,
-			room_id:data.room_id
-		  })
- 
-          const testVar = tracksSeed(tracksRes.data);		 
+				const tracksRes = await API.post("/questions/create",{
+					track_ids:data.track_ids,
+					room_id:data.room_id
+				})
+	
+				const testVar = tracksSeed(tracksRes.data.questions);		 
 
-		  console.log(testVar,"test");
+				console.log(testVar,"test");
+			}
+			catch (err) {
+				//catch err
+				console.log(err);
+			}
 		}
-		catch (err) {
+		
+			addToRedis();
+		}
+		else{
+			const addToRedis = async () => {
+			try {
+				const response = await API.post("/room/add_player",{
+					room_id:data.room_id,
+					user_id:data.username
+				})
+		
+				console.log(response.data);
+			}
+			catch (err) {
 			//catch err
-			console.log(err);
+				console.log(err);
+			}
 		}
-	  }
 	
-	  addToRedis();
-	}
-	else{
-	  const addToRedis = async () => {
-		try {
-		  const response = await API.post("/room/add_player",{
-			room_id:data.room,
-			user_id:data.username
-		  })
-  
-		  console.log(response.data);
+			addToRedis();
 		}
-		catch (err) {
-		  //catch err
-		  console.log(err);
-		}
-	  }
-  
-	  addToRedis();
-	}
 
-	// Welcome current user
-	socket.emit("message", formatMessage(botName, "Welcome to ChatCord!"));
+		// Welcome current user
+		socket.emit("message", formatMessage(botName, "Welcome to Vinyl!",false));
 
-	// Broadcast when a user connects
-	//send to everyone except to the sender
-	socket.broadcast
-	  .to(user.room)
-	  .emit(
-		"message",
-		formatMessage(botName, `${user.username} has joined the chat`)
-	  );
+		// Broadcast when a user connects
+		//send to everyone except to the sender
 
-	// Send users and room info
-	io.to(user.room).emit("roomUsers", {
-	  room: user.room,
-	  users: getRoomUsers(user.room),
+		socket.broadcast
+			.to(user.room)
+			.emit(
+				"message",
+				formatMessage(botName, `${user.username} has joined the chat`,false)
+			);
+
+		// Send users and room info
+		io.to(user.room).emit("roomUsers", {
+			room: user.room,
+			users: getRoomUsers(user.room),
+		});
+
 	});
 
-  });
+	// Listen for chatMessage
+	socket.on("chatMessage", (data:any) => { 
 
-  // Listen for chatMessage
-  	socket.on("chatMessage", (msg:any,roomId:any,id:any) => { 
+		console.log(data,"Data");
 
-	//!todo answer validation
+		API.post("/questions/check", {
+			answer:data.message,
+			question_id:data.questionId
+		}).then((res) => {
+			let correct;
+			console.log(res.data,"Data ans");
+			if(res.data.result === "True"){
+				console.log("in");
+				correct = true;
+			}
+			else{
+				console.log("else");
+				correct=false;
+			}
+			const user = getCurrentUser(socket.id);
+			io.to(user.room).emit("message", formatMessage(user.username, data.message,correct));
 
-	// const answerCheck = async () => {
-	// 	try {
-	// 	      const res = await API.post("/questions/fetch", {
-	// 			roomId,
-	// 		});
+		}).catch((err) => {
+			console.log(err);
+		});
 	
-	// 		return res.data;
-	// 	} catch (error) {
-	// 		console.error(error);
-	// 	}
-	// }
+	});
 
-	// const result = answerCheck();
-
-	// result.map((res:any) => {
-	// 	if(res.id === id){
-	// 		if(res.name === msg){
-	// 		}
-	// 	}
-	// })
-	
-	
-		const user = getCurrentUser(socket.id);
-		io.to(user.room).emit("message", formatMessage(user.username, msg));
-	
-  	});
-
-  	socket.on("startGame",(data:any) => {
-		var counter = 10;
-	
+	socket.on("startGame",(data:any) => {
+		
 		let user = getCurrentUser(socket.id);
+		let tracks = getTracks();
+		
+		let rounds = tracks.length;
+		round(tracks,user,rounds);
+	}) 
+		
+	const round = (tracks:any[],user:any,rounds:number) => {
 
-		io.to(user.room).emit("tracksData",getTracks());
+		//base cond
+		if(rounds <=0){
+			io.to(user.room).emit("game-end");
+			return;
+		}
+
+		var counter = 30;
+
+		//broadcast particular track
+		io.to(user.room).emit("tracksData",tracks[rounds-1]);
 
 		var roundCountdown = setInterval(() => {
 	
+			//broadcast countdown to users
 			io.to(user.room).emit('counter', counter);
 		
 			counter--;
@@ -184,31 +196,30 @@ io.on("connection", (socket:any) => {
 			if (counter === 0) {
 				//next round
 				clearInterval(roundCountdown);
+				rounds--;
+				round(tracks,user,rounds);
 			}
 		}, 1000);
-
-	}) 
-
-
-  socket.emit("getUsers",getUsers());
-
-  // Runs when client disconnects
-  socket.on("disconnect", () => {
-	const user = userLeave(socket.id);
-
-	if (user) {
-	  io.to(user.room).emit(
-		"message",
-		formatMessage(botName, `${user.username} has left the chat`)
-	  );
-
-	  // Send users and room info
-	  io.to(user.room).emit("roomUsers", {
-	      room: user.room,
-		users: getRoomUsers(user.room),
-	  });
 	}
-  });
 
-  
+	socket.emit("getUsers",getUsers());
+
+// Runs when client disconnects
+	socket.on("disconnect", () => {
+		const user = userLeave(socket.id);
+
+		if (user) {
+			io.to(user.room).emit(
+				"message",
+				formatMessage(botName, `${user.username} has left the chat`,false)
+			);
+
+		// Send users and room info
+			io.to(user.room).emit("roomUsers", {
+				room: user.room,
+				users: getRoomUsers(user.room),
+			});
+		}
+	});
+
 });

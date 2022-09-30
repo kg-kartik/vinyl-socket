@@ -5,7 +5,7 @@ interface track{
     question_id:string
 }
 
-let Tracks:Array<track> = [];
+export let Tracks:Array<track> = [];
 
 export const tracksSeed = (tracksArr:track[]) => {
     Tracks = tracksArr;
