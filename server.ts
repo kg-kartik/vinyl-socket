@@ -69,6 +69,9 @@ io.on("connection", (socket:any) => {
 		//joining room using socket id
 		socket.join(user.room);
 
+		// to display who joined
+		
+
 		if(data.type === "admin"){
 			const addToRedis = async () => {
 			try {
@@ -87,6 +90,8 @@ io.on("connection", (socket:any) => {
 				const testVar = tracksSeed(tracksRes.data.questions);		 
 
 				console.log(testVar,"test");
+				//socket.emit('player-joined',data.username);
+				socket.emit('player-joined',data.username);
 			}
 			catch (err) {
 				//catch err
@@ -103,7 +108,8 @@ io.on("connection", (socket:any) => {
 					room_id:data.room_id,
 					user_id:data.username
 				})
-		
+
+				socket.to(user.room).emit('player-joined',data.username);
 				console.log(response.data);
 			}
 			catch (err) {
