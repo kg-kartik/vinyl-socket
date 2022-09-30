@@ -52,6 +52,8 @@ var io = require("socket.io")(server,{
 });
 
 const botName = "Vinyl";
+var counter = 30;
+let leaderBoard:any[]=[];
   
   // Run when client connects
 io.on("connection", (socket:any) => {
@@ -68,8 +70,9 @@ io.on("connection", (socket:any) => {
 
 		//joining room using socket id
 		socket.join(user.room);
-
-		// to display who joined
+		
+		const userName=data.username;
+		
 		
 
 		if(data.type === "admin"){
@@ -143,10 +146,12 @@ io.on("connection", (socket:any) => {
 	});
 
 	// Listen for chatMessage
+
+	//result array
 	socket.on("chatMessage", (data:any) => { 
 
 		console.log(data,"Data");
-
+		const user = getCurrentUser(socket.id);
 		API.post("/questions/check", {
 			answer:data.message,
 			question_id:data.questionId
@@ -155,13 +160,17 @@ io.on("connection", (socket:any) => {
 			console.log(res.data,"Data ans");
 			if(res.data.result === "True"){
 				console.log("in");
+				
+				leaderBoard.push({key:[user.username],value:counter*10});
+
 				correct = true;
+
 			}
 			else{
 				console.log("else");
 				correct=false;
 			}
-			const user = getCurrentUser(socket.id);
+			
 			io.to(user.room).emit("message", formatMessage(user.username, data.message,correct));
 
 		}).catch((err) => {
@@ -174,7 +183,6 @@ io.on("connection", (socket:any) => {
 		
 		let user = getCurrentUser(socket.id);
 		let tracks = getTracks();
-		
 		let rounds = tracks.length;
 		round(tracks,user,rounds);
 	}) 
@@ -187,22 +195,47 @@ io.on("connection", (socket:any) => {
 			return;
 		}
 
-		var counter = 30;
+		getRoomUsers(user.room).map(ele=>{
+			leaderBoard.push({key:[ele.username],value:0});
+		})
+		counter=30;
 
 		//broadcast particular track
 		io.to(user.room).emit("tracksData",tracks[rounds-1]);
 
-		var roundCountdown = setInterval(() => {
+		var roundCountdown = setInterval(async() => {
 	
 			//broadcast countdown to users
 			io.to(user.room).emit('counter', counter);
 		
 			counter--;
 	
-			if (counter === 0) {
+			if (counter <= 0) {
 				//next round
 				clearInterval(roundCountdown);
 				rounds--;
+				//const scoreBoardJSON = JSON.stringify(Object.fromEntries(leaderBoard));
+
+				// [{"kartik":1},{}]
+				const scores = leaderBoard.reduce(
+					(obj, item) => Object.assign(obj, { [item.key]: item.value }), {});
+				  
+
+				try{
+					const response = await API.put('/room/update_score',{
+						room_id:user.room,
+						scores:scores
+					})
+					console.log("score-board updating",response)
+				    socket.emit("updated-score-board",response);
+					leaderBoard=[];
+				}
+				catch(err){
+					console.log(err)
+				}
+				
+
+				
 				round(tracks,user,rounds);
 			}
 		}, 1000);
