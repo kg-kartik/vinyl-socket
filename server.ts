@@ -47,7 +47,7 @@ var server = app.listen(PORTNUMBER, (): void => {
 var io = require("socket.io")(server,{
   cors: {
 	// origin: "http://localhost:3000/",
-	methods: ["GET", "POST"]
+	methods: ["GET", "POST","PUT"]
   }
 });
 
@@ -179,19 +179,63 @@ io.on("connection", (socket:any) => {
 	
 	});
 
-	socket.on("startGame",(data:any) => {
+	socket.on("startGame",async(data:any) => {
 		
 		let user = getCurrentUser(socket.id);
 		let tracks = getTracks();
 		let rounds = tracks.length;
+		getRoomUsers(user.room).map(ele=>{
+			leaderBoard.push({key:[ele.username],value:0});
+		})
+		const scores = leaderBoard.reduce(
+			(obj, item) => Object.assign(obj, { [item.key]: item.value }), {});
+		try{
+			const response = await API.put('/room/update_score',{
+				room_id:user.room,
+				scores:scores
+			})
+			console.log("score-board updating")
+			//socket.emit("updated-score-board",response);
+			io.to(user.room).emit("updated-score-board", response.data);
+			setTimeout(()=>{
+				io.to(user.room).emit("updated-score-board", response.data);
+			},1500)
+			leaderBoard=[];
+		}
+		catch(err){
+			console.log(err)
+		}
 		round(tracks,user,rounds);
 	}) 
 		
-	const round = (tracks:any[],user:any,rounds:number) => {
-
+	const round = async(tracks:any[],user:any,rounds:number) => {
+        console.log(rounds)
+	
 		//base cond
 		if(rounds <=0){
-			io.to(user.room).emit("game-end");
+			
+			getRoomUsers(user.room).map(ele=>{
+				leaderBoard.push({key:[ele.username],value:0});
+			})
+			const scores = leaderBoard.reduce(
+				(obj, item) => Object.assign(obj, { [item.key]: item.value }), {});
+			try{
+				const response = await API.put('/room/update_score',{
+					room_id:user.room,
+					scores:scores
+				})
+				console.log("score-board updating")
+				//socket.emit("updated-score-board",response);
+				 io.to(user.room).emit("game-end", response.data);
+
+				
+				leaderBoard=[];
+			}
+			catch(err){
+				console.log(err)
+			}
+
+			
 			return;
 		}
 
@@ -201,7 +245,13 @@ io.on("connection", (socket:any) => {
 		
 
 		//broadcast particular track
-		io.to(user.room).emit("tracksData",tracks[rounds-1]);
+		console.log(tracks[rounds-1],"this is the track")
+		
+		 io.to(user.room).emit("tracksData", tracks[rounds-1]);
+
+		 setTimeout(()=>{
+			io.to(user.room).emit("tracksData", tracks[rounds-1]);
+		 },1500)
 
 		var roundCountdown = setInterval(async() => {
 	
