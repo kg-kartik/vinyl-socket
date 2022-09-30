@@ -198,7 +198,7 @@ io.on("connection", (socket:any) => {
 		getRoomUsers(user.room).map(ele=>{
 			leaderBoard.push({key:[ele.username],value:0});
 		})
-		counter=30;
+		
 
 		//broadcast particular track
 		io.to(user.room).emit("tracksData",tracks[rounds-1]);
@@ -210,13 +210,13 @@ io.on("connection", (socket:any) => {
 		
 			counter--;
 	
-			if (counter <= 0) {
+			if (counter === 0) {
 				//next round
 				clearInterval(roundCountdown);
 				rounds--;
-				//const scoreBoardJSON = JSON.stringify(Object.fromEntries(leaderBoard));
-
-				// [{"kartik":1},{}]
+				
+				counter=30;
+				
 				const scores = leaderBoard.reduce(
 					(obj, item) => Object.assign(obj, { [item.key]: item.value }), {});
 				  
@@ -226,8 +226,9 @@ io.on("connection", (socket:any) => {
 						room_id:user.room,
 						scores:scores
 					})
-					console.log("score-board updating",response)
-				    socket.emit("updated-score-board",response);
+					console.log("score-board updating")
+				    //socket.emit("updated-score-board",response);
+					io.to(user.room).emit("updated-score-board",response.data);
 					leaderBoard=[];
 				}
 				catch(err){
